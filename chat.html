@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WeChat Style Chat Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f2f5;
+        }
+
+        .chat-container {
+            width: 400px;
+            height: 600px;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            background-color: white;
+        }
+
+        .chat-header {
+            background-color: #0078ff;
+            color: white;
+            padding: 10px;
+            text-align: center;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .chat-box {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            background-color: #f9f9f9;
+        }
+
+        .chat-message {
+            display: flex;
+            flex-direction: column;
+            margin: 8px 0;
+            font-size: 14px;
+        }
+
+        .message-content {
+            padding: 8px;
+            border-radius: 8px;
+            max-width: 70%;
+            word-wrap: break-word;
+            margin: 3px;
+        }
+
+        .message-content.you {
+            background-color: #0078ff;
+            color: white;
+            align-self: flex-end;
+        }
+
+        .message-content.server {
+            background-color: #e5e5ea;
+            color: black;
+            align-self: flex-start;
+        }
+
+        .message-time {
+            font-size: 10px;
+            color: gray;
+            margin-top: 3px;
+            align-self: flex-end;
+        }
+        .message-time-serve {
+            font-size: 10px;
+            color: gray;
+            margin-top: 3px;
+            align-self: flex-start;
+        }
+        .chat-input {
+            display: flex;
+            padding: 10px;
+            border-top: 1px solid #ccc;
+            background-color: #fff;
+        }
+
+        .chat-input input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            outline: none;
+        }
+
+        .chat-input button {
+            margin-left: 10px;
+            padding: 8px 12px;
+            border: none;
+            background-color: #0078ff;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .chat-input button:hover {
+            background-color: #005bb5;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="chat-container">
+        <div class="chat-header">WeChat Chat</div>
+        <div class="chat-box" id="chatBox">
+            <!-- Messages will appear here -->
+        </div>
+        <div class="chat-input">
+            <input type="text" id="messageInput" placeholder="Type your message..." />
+            <button onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        const chatBox = document.getElementById("chatBox");
+        const messageInput = document.getElementById("messageInput");
+        const ws = new WebSocket('ws://localhost:8080'); // Replace with your WebSocket server URL
+
+        ws.onopen = () => {
+            console.log('Connected to the server');
+        };
+
+        ws.onmessage = (event) => {
+            if (typeof event.data === "string") {
+                // 直接处理文本数据
+                appendMessage("Server", event.data, false);
+            } else if (event.data instanceof Blob) {
+                // 处理 Blob 数据
+                const reader = new FileReader();
+                reader.onload = function () {
+                    appendMessage("Server", reader.result, false); // 转换为字符串
+                };
+                reader.readAsText(event.data); // 读取 Blob 为文本
+            } else if (event.data instanceof ArrayBuffer) {
+                // 处理 ArrayBuffer 数据（部分服务器发送二进制数据）
+                const message = new TextDecoder("utf-8").decode(event.data);
+                appendMessage("Server", message, false);
+            } else {
+                console.error("Unsupported message type:", event.data);
+            }
+        };
+
+        ws.onclose = () => {
+            console.log('Disconnected from server');
+        };
+
+        function getCurrentTime() {
+            const now = new Date();
+            return now.toLocaleTimeString();
+        }
+
+        function appendMessage(sender, message, isYou) {
+            const messageElement = document.createElement("div");
+            messageElement.classList.add("chat-message");
+
+            const contentElement = document.createElement("div");
+            contentElement.classList.add("message-content", isYou ? "you" : "server");
+            contentElement.innerText = message;
+
+            const timeElement = document.createElement("div");
+            timeElement.classList.add(isYou ? "message-time" : "message-time-server");
+            timeElement.innerText = getCurrentTime();
+
+            messageElement.appendChild(contentElement);
+            messageElement.appendChild(timeElement);
+
+            chatBox.appendChild(messageElement);
+            chatBox.scrollTop = chatBox.scrollHeight; // Auto-scroll to bottom
+        }
+
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (message === "") return;
+
+            // Send message to WebSocket server
+            ws.send(message);
+            appendMessage("You", message, true);
+            messageInput.value = "";
+        }
+
+        // Allow Enter key to send messages
+        messageInput.addEventListener("keypress", function (event) {
+            if (event.key === "Enter") {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+
+</html>
